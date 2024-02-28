@@ -121,7 +121,8 @@
             </div>
 
             <div class="column mt-16 p-8 overflow-x-scroll overflow-y-none">
-                <pre><code class="javascript">window.webkit.messageHandlers.commonFunction.postMessage('')</code></pre>
+                <pre><code class="javascript">const response = await _ios.MessageHandler.postMessage('test', { phoneNumber: '010', message: 'SMS Message' });
+                    console.log(response);</code></pre>
             </div>
         </div>
 
