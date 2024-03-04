@@ -97,7 +97,7 @@
     
     const runCommonFunction = async () => {
         try {
-          const response = await _ios.MessageHandler.postMessage('test', { phoneNumber: '01028531301', message: 'SMS Message' });
+          const response = await _ios.MessageHandler.postMessage('outLink', { url: 'https://www.naver.com' });
           console.log(response);
         } catch (e) {
           console.error(e.message);
@@ -121,8 +121,9 @@
             </div>
 
             <div class="column mt-16 p-8 overflow-x-scroll overflow-y-none">
-                <pre><code class="javascript">const response = await _ios.MessageHandler.postMessage('test', { phoneNumber: '010', message: 'SMS Message' });
-                    console.log(response);</code></pre>
+                <pre><code class="javascript">const response = await _ios.MessageHandler.postMessage('outLink', { url: 'https://www.naver.com' });
+                    console.log(response);
+                </code></pre>
             </div>
         </div>
 

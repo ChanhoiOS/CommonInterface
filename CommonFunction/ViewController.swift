@@ -17,33 +17,40 @@ class ViewController: UIViewController {
     let webConfiguration = WKWebViewConfiguration()
     
     private var taskHandlers = [String: TaskHandler]()
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
         setContentController()
+        setFunction()
         setWebView()
     }
     
     func setContentController() {
         let contentController = WKUserContentController()
-        
-        taskHandlers["test"] = { (parameters) in
-             Promise<[String: Any]?> { (resolve, _) in
-               //... some task
-               //if success { // success
-                 var result = [String: Any]()
-                 result["success"] = true
-                 resolve(result)
-                 //return
-               //}
-               //throw TaskError(message: "Illegal State Error!!") // failure
-             }
-           }
-
-        
-        
         webConfiguration.userContentController = contentController
+    }
+    
+    func setFunction() {
+        taskHandlers["outLink"] = { param in
+            var result = [String: Any]()
+            
+            if let url = param["url"] as? String, self.urlInvalid(url) {
+                DispatchQueue.main.async {
+                    UIApplication.shared.open(URL(string: url)!, options: [:])
+                }
+                
+                result["success"] = true
+                return result
+            } else {
+                do {
+                    throw TaskError(message: "Illegal State Error!!")
+                } catch {
+                    result["success"] = false
+                    return result
+                }
+            }
+        }
     }
 
     func setWebView() {
@@ -82,27 +89,24 @@ class ViewController: UIViewController {
 }
 
 extension ViewController {
-    private func onSuccess(_ metadata: Metadata, _ payload: (Promise<[String : Any]?>)) -> Void {
-        onComplete(metadata, "window._ios.MessageHandler", "onSuccess", payload)
+    private func onCallback(_ metadata: Metadata, _ methodName: String, _ payload: [String : Any]) -> Void {
+        print("callback methodName: ", methodName)
+        onComplete(metadata, "window._ios.MessageHandler", methodName, payload)
     }
     
-    private func onFailure(_ metadata: Metadata, _ payload: [String : Any]?) -> Void {
-        //onComplete(metadata, "window._ios.MessageHandler", "onFailure", payload)
-    }
-    
-    private func onComplete(_ metadata: Metadata, _ objectName: String, _ methodName: String, _ payload: (Promise<[String : Any]?>)) -> Void {
+    private func onComplete(_ metadata: Metadata, _ objectName: String, _ methodName: String, _ payload: [String : Any]) -> Void {
         var script = "\(objectName).\(methodName)(\(metadata.sequence));"
         
-//        if let payload = payload, let json = JSON.stringify(payload) {
-//            script = "\(objectName).\(methodName)(\(metadata.sequence), '\(json)');"
-//        }
-        script = "\(objectName).\(methodName)(\(metadata.sequence), {success: true});"
+        if let jsonData = try? JSONSerialization.data(withJSONObject: payload),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            script = "\(objectName).\(methodName)(\(metadata.sequence), '\(jsonString)');"
+        }
         
         print("script: ", script)
+        
         webView?.evaluateJavaScript(script) { (_, error) in
-            //Logger.debug(script)
             if let error = error {
-              //  Logger.error(error.localizedDescription)
+                print("evaluate error: ", error)
             }
         }
     }
@@ -125,26 +129,20 @@ extension ViewController: WKScriptMessageHandler {
         let metadata = Metadata(sequence: sequence)
                 
         guard let taskHandler = taskHandlers[name] else {
-            let payload: [String: Any] = ["message": "handler with name '\(name)' not exists"]
-            onFailure(metadata, payload)
+            let payload: [String: Any] = ["success": false]
+            onCallback(metadata, "onFailure", payload)
 
             return
         }
 
         Task {
-            do {
-                let payload = try await(taskHandler(parameters))
-                print("payload: ", payload)
-                onSuccess(metadata, payload)
-            } catch let error {
-                var message = "Unknown Error"
-                if let error = error as? TaskError {
-                    message = error.message
-                } else {
-                    message = error.localizedDescription
-                }
-                let payload: [String: Any] = ["message": message]
-                onFailure(metadata, payload)
+            var payload = try await taskHandler(parameters)
+            let result = payload["success"] as? Bool ?? false
+            if result {
+                onCallback(metadata, "onSuccess", payload)
+            } else {
+                payload = ["success": false]
+                onCallback(metadata, "onFailure", payload)
             }
         }
     }
@@ -157,3 +155,12 @@ extension ViewController: WKNavigationDelegate {
     }
 }
 
+extension ViewController {
+    func urlInvalid(_ url: String) -> Bool {
+        if url.hasPrefix("https") || url.hasPrefix("http") || url.hasPrefix("www") {
+            return true
+        } else {
+            return false
+        }
+    }
+}

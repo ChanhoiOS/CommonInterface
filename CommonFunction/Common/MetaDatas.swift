@@ -16,4 +16,4 @@ struct TaskError: Error {
     let message: String
 }
 
-typealias TaskHandler = (_ parameters: [String: Any]) -> Promise<[String: Any]?>
+typealias TaskHandler = (_ param: [String: Any]) async throws -> [String: Any]
